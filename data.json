@@ -1,0 +1,42 @@
+{
+    "assignments": [
+        {
+            "id": 1,
+            "title": "Lab Record 4",
+            "subject": "Digital Electronics",
+            "due": "2026-02-10",
+            "status": "todo"
+        },
+        {
+            "id": 2,
+            "title": "Fourier Transform Essay",
+            "subject": "Signals & Systems",
+            "due": "2026-02-12",
+            "status": "doing"
+        }
+    ],
+    "attendance": [
+        {
+            "subject": "Digital Electronics",
+            "attended": 18,
+            "total": 25
+        },
+        {
+            "subject": "VLSI Design",
+            "attended": 28,
+            "total": 29
+        },
+        {
+            "subject": "Maths IV",
+            "attended": 15,
+            "total": 22
+        }
+    ],
+    "schedule": [
+        {
+            "time": "10:00",
+            "subject": "Digital Electronics",
+            "type": "REGULAR"
+        }
+    ]
+}

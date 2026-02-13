@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Life OS</title>
+    <style>
+        :root {
+            --primary: #2563eb; --primary-dark: #1e40af;
+            --secondary: #64748b; --bg: #f8fafc; --surface: #ffffff;
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --sidebar-width: 260px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg); color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: var(--sidebar-width); background: #0f172a; color: #e2e8f0;
+            padding: 24px; display: flex; flex-direction: column; gap: 8px;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.05); z-index: 10;
+        }
+        .logo { font-size: 1.25rem; font-weight: 800; color: white; margin-bottom: 30px; letter-spacing: -0.5px; }
+        .nav-item {
+            padding: 12px 16px; cursor: pointer; border-radius: 8px; font-size: 0.95rem; font-weight: 500;
+            transition: all 0.2s ease; display: flex; align-items: center; gap: 12px;
+        }
+        .nav-item:hover { background: #1e293b; color: white; transform: translateX(5px); }
+        .nav-item.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; background: var(--bg); }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h2 { font-size: 1.8rem; font-weight: 700; color: #0f172a; letter-spacing: -1px; }
+
+        /* --- COMPONENTS --- */
+        .btn {
+            background: var(--primary); color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
+        }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-danger { background: #fee2e2; color: #991b1b; padding: 6px 10px; border-radius: 6px; border:none; cursor: pointer;}
+        .card { background: var(--surface); padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; }
+
+        /* --- KANBAN BOARD (ASSIGNMENTS) --- */
+        .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; height: calc(100vh - 150px); }
+        .kanban-column { background: #f1f5f9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .column-header { font-weight: 700; color: var(--secondary); text-transform: uppercase; font-size: 0.8rem; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .kanban-card {
+            background: white; padding: 16px; border-radius: 8px; cursor: grab;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); border: 1px solid #e2e8f0; transition: 0.2s;
+        }
+        .kanban-card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.06); border-color: var(--primary); }
+        .tag { font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; display: inline-block; margin-bottom: 8px; }
+
+        /* --- ATTENDANCE CALCULATOR --- */
+        .attendance-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #f1f5f9; }
+        .attendance-input { width: 60px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; }
+        .attendance-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
+        .badge-safe { background: #dcfce7; color: #166534; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+
+        /* --- STATUS INDICATOR --- */
+        .status-indicator {
+            position: fixed; top: 20px; right: 20px; padding: 10px 16px; border-radius: 20px;
+            font-size: 0.85rem; font-weight: 600; z-index: 1000;
+        }
+        .status-online { background: #dcfce7; color: #166534; }
+        .status-offline { background: #fee2e2; color: #991b1b; }
+
+        /* --- ANIMATIONS --- */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: white; padding: 30px; border-radius: 16px; width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 0.9rem; font-weight: 500; color: var(--secondary); }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="logo">StudentOS <span style="color:var(--primary)"></span></div>
+        <div class="nav-item active" onclick="loadView('dashboard', this)"><span>📊</span> Dashboard</div>
+        <div class="nav-item" onclick="loadView('assignments', this)"><span>📋</span> Assignments</div>
+        <div class="nav-item" onclick="loadView('attendance', this)"><span>📈</span> Attendance</div>
+        <div class="nav-item" onclick="loadView('schedule', this)"><span>📅</span> Schedule</div>
+        
+        <div style="margin-top: auto; border-top: 1px solid #334155; padding-top: 20px;">
+            <button class="nav-item" style="background:none; color:#ef4444; width:100%;" onclick="hardReset()">⚠ Reset Data</button>
+        </div>
+    </div>
+
+    <div class="main-content" id="app"></div>
+
+    <div class="status-indicator" id="statusIndicator">🔄 Connecting...</div>
+
+    <datalist id="allSubjectsList"></datalist>
+
+    <div class="modal" id="assignmentModal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">New Assignment</h3>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="taskTitle" placeholder="e.g. Lab Report">
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <input type="text" id="taskSubject" list="allSubjectsList" placeholder="Type or select subject...">
+            </div>
+            <div class="form-group">
+                <label>Due Date</label>
+                <input type="date" id="taskDate">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn" style="background:transparent; color:#64748b; border:1px solid #cbd5e1" onclick="closeModal('assignmentModal')">Cancel</button>
+                <button class="btn" onclick="saveAssignment()">Create Task</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="scheduleModal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">Add Class</h3>
+            <div class="form-group">
+                <label>Time</label>
+                <input type="time" id="schedTime">
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <input type="text" id="schedSubject" list="allSubjectsList" placeholder="e.g. VLSI Design">
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select id="schedType">
+                    <option value="REGULAR">Regular Class</option>
+                    <option value="LAB">Laboratory</option>
+                    <option value="TUTORIAL">Tutorial</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn" style="background:transparent; color:#64748b; border:1px solid #cbd5e1" onclick="closeModal('scheduleModal')">Cancel</button>
+                <button class="btn" onclick="saveScheduleItem()">Add Class</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="attendanceModal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">Track New Subject</h3>
+            <div class="form-group">
+                <label>Subject Name</label>
+                <input type="text" id="newAttSubject" placeholder="e.g. Artificial Intelligence">
+            </div>
+            <div class="form-group">
+                <label>Classes Already Held</label>
+                <input type="number" id="newAttTotal" value="0">
+            </div>
+            <div class="form-group">
+                <label>Classes Attended</label>
+                <input type="number" id="newAttAttended" value="0">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn" style="background:transparent; color:#64748b; border:1px solid #cbd5e1" onclick="closeModal('attendanceModal')">Cancel</button>
+                <button class="btn" onclick="addNewAttendanceSubject()">Start Tracking</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        const defaultState = {
+            assignments: [
+                { id: 1, title: "Lab Record 4", subject: "Digital Electronics", due: "2026-02-10", status: "todo" },
+            ],
+            attendance: [
+                { subject: "Digital Electronics", attended: 18, total: 25 },
+                { subject: "Maths IV", attended: 15, total: 22 }
+            ],
+            schedule: [
+                { time: "10:00", subject: "Digital Electronics", type: "REGULAR" }
+            ]
+        };
+
+        let state = JSON.parse(JSON.stringify(defaultState));
+        let isBackendConnected = false;
+
+        async function init() {
+            try {
+                const response = await fetch(`${API_URL}/load`);
+                const serverData = await response.json();
+                if (Object.keys(serverData).length !== 0) state = serverData;
+                isBackendConnected = true;
+                updateStatusIndicator(true);
+            } catch (error) {
+                console.error("Backend offline", error);
+                isBackendConnected = false;
+                updateStatusIndicator(false);
+            }
+            
+            // Populate auto-complete suggestions
+            updateSubjectSuggestions();
+
+            const activeTab = document.querySelector('.nav-item.active');
+            if(activeTab) {
+                const view = activeTab.getAttribute('onclick').match(/'([^']+)'/)[1];
+                loadView(view, activeTab);
+            } else {
+                loadView('dashboard', document.querySelector('.nav-item'));
+            }
+        }
+
+        async function saveData() {
+            // Update suggestions whenever data changes
+            updateSubjectSuggestions();
+            
+            // Refresh current view
+            const activeTab = document.querySelector('.nav-item.active');
+            if(activeTab) {
+                 const view = activeTab.getAttribute('onclick').match(/'([^']+)'/)[1];
+                 loadView(view, null);
+            }
+
+            if (!isBackendConnected) return;
+            try {
+                await fetch(`${API_URL}/save`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ state: state })
+                });
+            } catch (error) {
+                isBackendConnected = false;
+                updateStatusIndicator(false);
+            }
+        }
+
+        function updateSubjectSuggestions() {
+            // Collect all unique subjects from all lists
+            const subjects = new Set();
+            state.attendance.forEach(x => subjects.add(x.subject));
+            state.schedule.forEach(x => subjects.add(x.subject));
+            state.assignments.forEach(x => subjects.add(x.subject));
+
+            const datalist = document.getElementById('allSubjectsList');
+            datalist.innerHTML = Array.from(subjects).map(s => `<option value="${s}">`).join('');
+        }
+
+        function updateStatusIndicator(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            if (connected) {
+                indicator.textContent = '✅ Backend Online';
+                indicator.className = 'status-indicator status-online';
+            } else {
+                indicator.textContent = '❌ Backend Offline';
+                indicator.className = 'status-indicator status-offline';
+            }
+        }
+
+        function hardReset() {
+            if(confirm("Factory Reset?")) {
+                state = JSON.parse(JSON.stringify(defaultState));
+                saveData();
+            }
+        }
+
+        function loadView(viewName, element) {
+            const app = document.getElementById('app');
+            if(element) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                element.classList.add('active');
+            }
+            app.innerHTML = ''; 
+            if(viewName === 'dashboard') renderDashboard(app);
+            else if(viewName === 'assignments') renderKanban(app);
+            else if(viewName === 'attendance') renderAttendance(app);
+            else renderSchedule(app);
+        }
+
+        // --- RENDERERS ---
+        function renderDashboard(container) {
+            const totalTasks = state.assignments.length;
+            const doneTasks = state.assignments.filter(t => t.status === 'done').length;
+            const progress = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
+            const totalAttended = state.attendance.reduce((sum, sub) => sum + sub.attended, 0);
+            const totalClasses = state.attendance.reduce((sum, sub) => sum + sub.total, 0);
+            const overallAttendance = totalClasses === 0 ? 0 : Math.round((totalAttended / totalClasses) * 100);
+
+            container.innerHTML = `
+                <div class="animate-in">
+                    <div class="section-header">
+                        <h2>Executive Dashboard</h2>
+                        <span style="color:var(--secondary)">${new Date().toDateString()}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 30px;">
+                        <div class="card" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white;">
+                            <div style="opacity: 0.8; margin-bottom: 5px;">Overall Attendance</div>
+                            <div style="font-size: 2.5rem; font-weight: 800;">${overallAttendance}%</div>
+                            <div style="font-size: 0.9rem;">${overallAttendance < 75 ? '⚠️ Warning' : '✅ Good Standing'}</div>
+                        </div>
+                        <div class="card">
+                            <div style="color:var(--secondary); margin-bottom: 5px;">Assignment Completion</div>
+                            <div style="font-size: 2.5rem; font-weight: 800; color:#1e293b;">${progress}%</div>
+                            <div style="width: 100%; background: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 10px;">
+                                <div style="width: ${progress}%; background: var(--success); height: 100%; border-radius: 3px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderKanban(container) {
+            const cols = { todo: [], doing: [], done: [] };
+            state.assignments.forEach(task => cols[task.status].push(task));
+
+            container.innerHTML = `
+                <div class="animate-in" style="height: 100%;">
+                    <div class="section-header">
+                        <h2>Assignment Tracker</h2>
+                        <button class="btn" onclick="openModal('assignmentModal')">+ New Task</button>
+                    </div>
+                    <div class="kanban-board">
+                        ${['todo', 'doing', 'done'].map(status => `
+                            <div class="kanban-column">
+                                <div class="column-header">
+                                    <span>${status.toUpperCase()}</span>
+                                    <span>${cols[status].length}</span>
+                                </div>
+                                <div style="flex:1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                                    ${cols[status].map(task => `
+                                        <div class="kanban-card">
+                                            <span class="tag">${task.subject}</span>
+                                            <div style="font-weight: 600; margin-bottom: 4px;">${task.title}</div>
+                                            <div style="font-size: 0.8rem; color: var(--secondary); margin-bottom: 10px;">Due: ${task.due}</div>
+                                            <div style="display: flex; gap: 5px;">
+                                                ${status !== 'todo' ? `<button onclick="moveTask(${task.id}, -1)" style="padding:4px 8px; border:1px solid #e2e8f0; background:white; border-radius:4px; cursor:pointer;">←</button>` : ''}
+                                                ${status !== 'done' ? `<button onclick="moveTask(${task.id}, 1)" style="padding:4px 8px; border:1px solid #e2e8f0; background:white; border-radius:4px; cursor:pointer; flex:1;">Next →</button>` : ''}
+                                                <button onclick="deleteTask(${task.id})" style="padding:4px 8px; border:1px solid #fee2e2; background:#fee2e2; color:#991b1b; border-radius:4px; cursor:pointer;">🗑</button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAttendance(container) {
+            container.innerHTML = `
+                <div class="animate-in">
+                    <div class="section-header">
+                        <h2>Attendance Analytics</h2>
+                        <button class="btn" onclick="openModal('attendanceModal')">+ Track New Subject</button>
+                    </div>
+                    <div class="card">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 0.5fr; gap: 20px; font-weight: bold; color: var(--secondary); margin-bottom: 15px; font-size: 0.85rem; text-transform: uppercase;">
+                            <div>Subject</div>
+                            <div style="text-align:center;">Attended</div>
+                            <div style="text-align:center;">Total</div>
+                            <div style="text-align:center;">%</div>
+                            <div>Insight</div>
+                            <div></div>
+                        </div>
+                        ${state.attendance.map((sub, index) => {
+                            const pct = sub.total === 0 ? 0 : Math.round((sub.attended / sub.total) * 100);
+                            const isLow = pct < 75;
+                            const color = isLow ? 'var(--danger)' : 'var(--success)';
+                            const insight = isLow 
+                                ? `Attend next <strong>${Math.max(0, Math.ceil((0.75 * sub.total - sub.attended) / 0.25))}</strong>` 
+                                : `Safe to bunk <strong>${Math.floor((sub.attended - 0.75 * sub.total) / 0.75)}</strong>`;
+
+                            return `
+                                <div class="attendance-row">
+                                    <div style="font-weight: 600;">${sub.subject}</div>
+                                    <div style="text-align:center;">
+                                        <input type="number" class="attendance-input" value="${sub.attended}" onchange="updateAttendance(${index}, 'attended', this.value)">
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <input type="number" class="attendance-input" value="${sub.total}" onchange="updateAttendance(${index}, 'total', this.value)">
+                                    </div>
+                                    <div style="text-align:center; font-weight:bold; color:${color};">${pct}%</div>
+                                    <div style="font-size: 0.85rem; color: var(--secondary);">
+                                        <span class="attendance-badge ${isLow ? 'badge-danger' : 'badge-safe'}">
+                                            ${pct < 75 ? '⚠ Warning' : '✅ Safe'}
+                                        </span>
+                                        <div style="font-size: 0.75rem; margin-top: 4px;">${insight}</div>
+                                    </div>
+                                    <button onclick="deleteAttendanceSubject(${index})" style="background:none; border:none; color:#ef4444; cursor:pointer;">✖</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSchedule(container) {
+            state.schedule.sort((a,b) => a.time.localeCompare(b.time));
+            container.innerHTML = `
+                <div class="animate-in">
+                    <div class="section-header">
+                        <h2>Weekly Schedule</h2>
+                        <button class="btn" onclick="openModal('scheduleModal')">+ Add Class</button>
+                    </div>
+                    <div class="card">
+                        ${state.schedule.map((slot, index) => `
+                            <div style="padding: 16px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display:flex; align-items:center; gap:20px;">
+                                    <div style="font-size: 1.1rem; font-weight: 700; background:#f1f5f9; padding:8px 12px; border-radius:8px;">${slot.time}</div>
+                                    <div>
+                                        <div style="font-weight: 600; font-size:1.05rem;">${slot.subject}</div>
+                                        <div style="color: var(--secondary); font-size: 0.85rem; margin-top:4px;">
+                                            <span style="background:${slot.type === 'LAB' ? '#e0f2fe' : '#f1f5f9'}; color:${slot.type === 'LAB' ? '#0284c7' : '#64748b'}; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:bold;">${slot.type}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-danger" onclick="deleteScheduleItem(${index})">🗑</button>
+                            </div>
+                        `).join('') || '<p style="color: var(--secondary); text-align: center; padding: 40px;">No classes scheduled.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- ACTIONS ---
+        function moveTask(id, direction) {
+            const task = state.assignments.find(t => t.id === id);
+            const flow = ['todo', 'doing', 'done'];
+            const currentIndex = flow.indexOf(task.status);
+            if (flow[currentIndex + direction]) {
+                task.status = flow[currentIndex + direction];
+                saveData();
+            }
+        }
+
+        function deleteTask(id) {
+            if(confirm("Delete this task?")) {
+                state.assignments = state.assignments.filter(t => t.id !== id);
+                saveData();
+            }
+        }
+
+        function saveAssignment() {
+            const title = document.getElementById('taskTitle').value;
+            const subject = document.getElementById('taskSubject').value;
+            const due = document.getElementById('taskDate').value;
+            if(!title || !due || !subject) return alert("Please fill all fields");
+
+            state.assignments.push({ id: Date.now(), title, subject, due, status: 'todo' });
+            closeModal('assignmentModal');
+            saveData();
+        }
+
+        function updateAttendance(index, field, value) {
+            state.attendance[index][field] = parseInt(value) || 0;
+            saveData();
+        }
+
+        // NEW: Add Subject to Attendance
+        function addNewAttendanceSubject() {
+            const subject = document.getElementById('newAttSubject').value;
+            const total = parseInt(document.getElementById('newAttTotal').value) || 0;
+            const attended = parseInt(document.getElementById('newAttAttended').value) || 0;
+
+            if(!subject) return alert("Subject name required");
+
+            state.attendance.push({ subject, attended, total });
+            closeModal('attendanceModal');
+            saveData();
+        }
+
+        function deleteAttendanceSubject(index) {
+            if(confirm("Stop tracking attendance for this subject?")) {
+                state.attendance.splice(index, 1);
+                saveData();
+            }
+        }
+
+        function saveScheduleItem() {
+            const time = document.getElementById('schedTime').value;
+            const subject = document.getElementById('schedSubject').value;
+            const type = document.getElementById('schedType').value;
+            if(!time || !subject) return alert("Please fill time and subject");
+
+            state.schedule.push({ time, subject, type });
+            closeModal('scheduleModal');
+            saveData();
+        }
+
+        function deleteScheduleItem(index) {
+            if(confirm("Remove this class?")) {
+                state.schedule.splice(index, 1);
+                saveData();
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { 
+            document.getElementById(id).style.display = 'none';
+            document.querySelectorAll(`#${id} input`).forEach(i => i.value = '');
+        }
+
+        init();
+    </script>
+</body>
+</html>
