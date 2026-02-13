@@ -46,7 +46,7 @@ app.add_middleware(
 # --- Pydantic Models ---
 class UserLogin(BaseModel):
     usn: str
-    username: str
+    username: str  # The JS must send 'username', not 'name'
 
 class StateUpdate(BaseModel):
     usn: str
