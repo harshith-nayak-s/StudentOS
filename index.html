@@ -3,17 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Life OS</title>
+    <title>Student Life OS Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #2563eb; --primary-dark: #1e40af;
             --secondary: #64748b; --bg: #f8fafc; --surface: #ffffff;
-            --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --text: #1e293b; --border: #f1f5f9;
+            --success: #10b981; --danger: #ef4444;
             --sidebar-width: 260px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background-color: var(--bg); color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
+        .dark-theme {
+            --bg: #0f172a; --surface: #1e293b; --text: #f1f5f9;
+            --border: #334155; --secondary: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; }
+        body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
         /* --- LOGIN SCREEN --- */
         #login-overlay {
@@ -23,7 +30,7 @@
         }
         .login-card {
             background: white; padding: 40px; border-radius: 16px; width: 400px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); text-align: center; color: #0f172a;
         }
         .login-input {
             width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #cbd5e1;
@@ -32,15 +39,15 @@
 
         /* --- SIDEBAR --- */
         .sidebar {
-            width: var(--sidebar-width); background: #0f172a; color: #e2e8f0;
+            width: var(--sidebar-width); background: #1e293b; color: #e2e8f0;
             padding: 24px; display: flex; flex-direction: column; gap: 8px;
         }
-        .logo { font-size: 1.5rem; font-weight: 800; color: white; margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: 800; color: white; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .nav-item {
             padding: 12px 16px; cursor: pointer; border-radius: 8px; font-weight: 500;
-            transition: 0.2s; display: flex; align-items: center; gap: 12px;
+            display: flex; align-items: center; gap: 12px;
         }
-        .nav-item:hover { background: #1e293b; }
+        .nav-item:hover { background: #334155; }
         .nav-item.active { background: var(--primary); color: white; }
 
         /* --- MAIN CONTENT --- */
@@ -48,52 +55,54 @@
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
 
         /* --- UI COMPONENTS --- */
-        .card { background: var(--surface); padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; }
+        .card { background: var(--surface); padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid var(--border); }
         .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .btn-danger { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; }
         
-        /* --- KANBAN --- */
         .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .kanban-column { background: #f1f5f9; padding: 15px; border-radius: 12px; min-height: 400px; }
-        .kanban-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e2e8f0; }
+        .kanban-column { background: rgba(0,0,0,0.03); padding: 15px; border-radius: 12px; min-height: 400px; }
+        .kanban-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
         .tag { font-size: 0.7rem; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; }
 
-        /* --- MODALS --- */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 30px; border-radius: 16px; width: 400px; }
+        .modal-content { background: var(--surface); padding: 30px; border-radius: 16px; width: 400px; color: var(--text); }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 
         .status-indicator { position: fixed; bottom: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
         .status-online { background: #dcfce7; color: #166534; }
         .status-offline { background: #fee2e2; color: #991b1b; }
 
-        .attendance-row { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
-        .attendance-input { width: 60px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; }
+        .attendance-row { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .attendance-input { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; text-align: center; background: var(--bg); color: var(--text); }
     </style>
 </head>
 <body>
 
     <div id="login-overlay">
         <div class="login-card">
-            <h2>Welcome Back</h2>
-            <p style="margin-bottom: 25px; color: var(--secondary);">Enter your details to sync your data</p>
-            <input type="text" id="loginUsername" class="login-input" placeholder="Name">
+            <h2 style="font-size: 1.8rem; margin-bottom: 10px;">🎓 StudentOS</h2>
+            <p style="margin-bottom: 25px; color: #64748b;">Sign in to sync your dashboard</p>
+            <input type="text" id="loginUsername" class="login-input" placeholder="Your Name">
             <input type="text" id="loginUsn" class="login-input" placeholder="USN (e.g. 1MJ24CS001)" style="text-transform: uppercase;">
-            <button class="btn" onclick="attemptLogin()" style="width: 100%;">Sign In</button>
+            <button class="btn" onclick="attemptLogin()" style="width: 100%;">Access OS</button>
             <p id="loginError" style="color: var(--danger); margin-top: 15px; display: none;"></p>
         </div>
     </div>
 
     <div class="sidebar">
-        <div class="logo">StudentOS</div>
+        <div class="logo">
+            <span>StudentOS</span>
+            <span onclick="toggleDarkMode()" style="cursor:pointer; font-size: 1.2rem;" title="Toggle Dark Mode">🌓</span>
+        </div>
         <div class="nav-item active" onclick="loadView('dashboard', this)">📊 Dashboard</div>
         <div class="nav-item" onclick="loadView('assignments', this)">📋 Assignments</div>
         <div class="nav-item" onclick="loadView('attendance', this)">📈 Attendance</div>
         <div class="nav-item" onclick="loadView('schedule', this)">📅 Schedule</div>
-        <div id="userDisplay" style="margin-top: auto; font-size: 0.8rem; opacity: 0.7;"></div>
-        <div class="nav-item" style="color: var(--danger);" onclick="logout()">🔒 Logout</div>
+        
+        <div id="userDisplay" style="margin-top: auto; font-size: 0.75rem; opacity: 0.6; padding: 10px 16px;"></div>
+        <div class="nav-item" style="color: #fda4af;" onclick="logout()">🔒 Logout</div>
     </div>
 
     <div class="main-content" id="app"></div>
@@ -101,20 +110,19 @@
 
     <div class="modal" id="assignmentModal">
         <div class="modal-content">
-            <h3>Add Task</h3><br>
+            <h3>New Task</h3><br>
             <div class="form-group"><label>Title</label><input type="text" id="taskTitle"></div>
             <div class="form-group"><label>Subject</label><input type="text" id="taskSubject"></div>
-            <div class="form-group"><label>Due Date</label><input type="date" id="taskDate"></div>
-            <button class="btn" onclick="saveAssignment()">Save</button>
+            <button class="btn" onclick="saveAssignment()">Add Task</button>
             <button class="btn" style="background:none; color:var(--secondary)" onclick="closeModal('assignmentModal')">Cancel</button>
         </div>
     </div>
 
     <div class="modal" id="attendanceModal">
         <div class="modal-content">
-            <h3>Track New Subject</h3><br>
+            <h3>Add Subject</h3><br>
             <div class="form-group"><label>Subject Name</label><input type="text" id="newAttSubject"></div>
-            <button class="btn" onclick="addNewAttendanceSubject()">Add</button>
+            <button class="btn" onclick="addNewAttendanceSubject()">Track Subject</button>
             <button class="btn" style="background:none; color:var(--secondary)" onclick="closeModal('attendanceModal')">Cancel</button>
         </div>
     </div>
@@ -134,14 +142,13 @@
         let currentUser = { username: "", usn: "" };
         let currentView = 'dashboard';
         let isBackendConnected = false;
+        let attendanceChart = null;
         let state = { assignments: [], attendance: [], schedule: [] };
 
-        // --- AUTH ---
         async function attemptLogin() {
             const name = document.getElementById('loginUsername').value.trim();
             const usn = document.getElementById('loginUsn').value.trim().toUpperCase();
-            if(!name || !usn) return alert("Fill all fields");
-
+            if(!name || !usn) return;
             currentUser = { username: name, usn: usn };
 
             try {
@@ -155,17 +162,15 @@
                 isBackendConnected = true;
                 document.getElementById('login-overlay').style.display = 'none';
                 document.querySelector('.main-content').style.display = 'block';
-                document.getElementById('userDisplay').innerText = `Logged in as: ${currentUser.usn}`;
-                saveData(); // Initial Render
+                document.getElementById('userDisplay').innerText = `ID: ${currentUser.usn}`;
+                saveData();
             } catch (e) {
-                alert("Server not responding. Using local mode.");
                 document.getElementById('login-overlay').style.display = 'none';
                 document.querySelector('.main-content').style.display = 'block';
                 saveData();
             }
         }
 
-        // --- CORE REFRESH LOGIC ---
         function renderCurrentView() {
             const app = document.getElementById('app');
             app.innerHTML = '';
@@ -176,11 +181,9 @@
         }
 
         async function saveData() {
-            renderCurrentView(); // Immediate UI refresh (The Fix)
-            
+            renderCurrentView(); 
             updateStatusIndicator(isBackendConnected);
             if (!isBackendConnected) return;
-
             try {
                 await fetch(`${API_URL}/save`, {
                     method: "POST",
@@ -199,18 +202,58 @@
             renderCurrentView();
         }
 
-        // --- RENDERING ---
+        // --- DASHBOARD WITH CHART ---
         function renderDashboard(container) {
             const done = state.assignments.filter(t => t.status === 'done').length;
             const progress = state.assignments.length ? Math.round((done/state.assignments.length)*100) : 0;
+            
             container.innerHTML = `
-                <div class="section-header"><h2>Dashboard</h2></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                    <div class="card"><h3>Tasks</h3><p>${progress}% Complete</p></div>
-                    <div class="card"><h3>Schedule</h3><p>${state.schedule.length} Classes today</p></div>
+                <div class="section-header"><h2>Welcome, ${currentUser.username}</h2></div>
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:25px;">
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div class="card" style="background: var(--primary); color: white;">
+                            <h3>Task Progress</h3>
+                            <h1 style="font-size:3rem; margin:10px 0;">${progress}%</h1>
+                            <p>${done} of ${state.assignments.length} completed</p>
+                        </div>
+                        <div class="card">
+                            <h3>Upcoming</h3>
+                            <p style="margin-top:10px; color:var(--secondary)">${state.schedule.length} classes today</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>Attendance Analysis</h3>
+                        <canvas id="attendanceChart" style="max-height: 250px; margin-top: 20px;"></canvas>
+                    </div>
                 </div>`;
+            
+            // Initialize Chart
+            setTimeout(() => {
+                const ctx = document.getElementById('attendanceChart').getContext('2d');
+                const labels = state.attendance.map(s => s.subject);
+                const data = state.attendance.map(s => s.total === 0 ? 0 : Math.round((s.attended/s.total)*100));
+                
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Attendance %',
+                            data: data,
+                            backgroundColor: data.map(v => v < 75 ? '#ef4444' : '#2563eb'),
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { 
+                        responsive: true,
+                        scales: { y: { beginAtZero: true, max: 100 } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }, 50);
         }
 
+        // --- REMAINDER OF FUNCTIONS ---
         function renderKanban(container) {
             const cols = { todo: [], doing: [], done: [] };
             state.assignments.forEach(t => cols[t.status].push(t));
@@ -257,11 +300,11 @@
                             <span style="color:var(--primary); font-weight:bold; width:80px;">${s.time}</span>
                             <span style="flex:1">${s.subject}</span>
                             <button class="btn-danger" onclick="deleteSched(${i})">Remove</button>
-                        </div>`).join('') || '<p>Free day!</p>'}
+                        </div>`).join('') || '<p>No classes scheduled.</p>'}
                 </div>`;
         }
 
-        // --- ACTIONS ---
+        function toggleDarkMode() { document.body.classList.toggle('dark-theme'); }
         function saveAssignment() {
             const title = document.getElementById('taskTitle').value;
             const subject = document.getElementById('taskSubject').value;
@@ -270,14 +313,12 @@
             closeModal('assignmentModal');
             saveData();
         }
-
         function moveTask(id, dir) {
             const t = state.assignments.find(x => x.id === id);
             const flow = ['todo', 'doing', 'done'];
             t.status = flow[flow.indexOf(t.status) + dir];
             saveData();
         }
-
         function deleteTask(id) { state.assignments = state.assignments.filter(x => x.id !== id); saveData(); }
         function updateAtt(i, f, v) { state.attendance[i][f] = parseInt(v) || 0; saveData(); }
         function addNewAttendanceSubject() {
@@ -295,14 +336,13 @@
             saveData();
         }
         function deleteSched(i) { state.schedule.splice(i, 1); saveData(); }
-
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         function logout() { location.reload(); }
         function updateStatusIndicator(on) {
             const ind = document.getElementById('statusIndicator');
             ind.className = `status-indicator ${on ? 'status-online' : 'status-offline'}`;
-            ind.innerText = on ? '● Synced' : '○ Offline';
+            ind.innerText = on ? '● Cloud Synced' : '○ Offline Mode';
         }
     </script>
 </body>
