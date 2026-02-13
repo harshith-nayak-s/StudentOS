@@ -15,6 +15,22 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', 'Segoe UI', sans-serif; }
         body { background-color: var(--bg); color: #1e293b; display: flex; height: 100vh; overflow: hidden; }
 
+        /* --- LOGIN SCREEN --- */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a; z-index: 9999; display: flex;
+            justify-content: center; align-items: center;
+        }
+        .login-card {
+            background: white; padding: 40px; border-radius: 16px; width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); text-align: center;
+        }
+        .login-input {
+            width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #cbd5e1;
+            border-radius: 8px; font-size: 1rem; outline: none; transition: 0.2s;
+        }
+        .login-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
         /* --- SIDEBAR --- */
         .sidebar {
             width: var(--sidebar-width); background: #0f172a; color: #e2e8f0;
@@ -30,7 +46,7 @@
         .nav-item.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 
         /* --- MAIN CONTENT --- */
-        .main-content { flex: 1; padding: 40px; overflow-y: auto; background: var(--bg); }
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; background: var(--bg); display: none; } /* Hidden by default */
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         h2 { font-size: 1.8rem; font-weight: 700; color: #0f172a; letter-spacing: -1px; }
 
@@ -65,7 +81,7 @@
         /* --- STATUS INDICATOR --- */
         .status-indicator {
             position: fixed; top: 20px; right: 20px; padding: 10px 16px; border-radius: 20px;
-            font-size: 0.85rem; font-weight: 600; z-index: 1000;
+            font-size: 0.85rem; font-weight: 600; z-index: 1000; display: none;
         }
         .status-online { background: #dcfce7; color: #166534; }
         .status-offline { background: #fee2e2; color: #991b1b; }
@@ -84,15 +100,29 @@
 </head>
 <body>
 
+    <div id="login-overlay">
+        <div class="login-card">
+            <div style="font-size: 2rem; margin-bottom: 10px;">🎓</div>
+            <h2 style="margin-bottom: 5px;">StudentOS</h2>
+            <p style="color: var(--secondary); margin-bottom: 30px;">Enter your credentials to continue</p>
+            
+            <input type="text" id="loginUsername" class="login-input" placeholder="Your Name" required>
+            <input type="text" id="loginUsn" class="login-input" placeholder="USN (e.g. 1MJ24CS001)" required style="text-transform: uppercase;">
+            
+            <button class="btn" onclick="attemptLogin()" style="width: 100%;">Access Dashboard</button>
+            <p id="loginError" style="color: var(--danger); font-size: 0.9rem; margin-top: 15px; display: none;">Connection Failed</p>
+        </div>
+    </div>
+
     <div class="sidebar">
-        <div class="logo">StudentOS <span style="color:var(--primary)"></span></div>
+        <div class="logo">StudentOS <span id="userDisplay" style="color:var(--primary); font-size:0.8rem; font-weight:400; display:block; margin-top:5px;"></span></div>
         <div class="nav-item active" onclick="loadView('dashboard', this)"><span>📊</span> Dashboard</div>
         <div class="nav-item" onclick="loadView('assignments', this)"><span>📋</span> Assignments</div>
         <div class="nav-item" onclick="loadView('attendance', this)"><span>📈</span> Attendance</div>
         <div class="nav-item" onclick="loadView('schedule', this)"><span>📅</span> Schedule</div>
         
         <div style="margin-top: auto; border-top: 1px solid #334155; padding-top: 20px;">
-            <button class="nav-item" style="background:none; color:#ef4444; width:100%;" onclick="hardReset()">⚠ Reset Data</button>
+            <button class="nav-item" style="background:none; color:#ef4444; width:100%;" onclick="logout()">🔒 Logout</button>
         </div>
     </div>
 
@@ -173,54 +203,87 @@
     </div>
 
     <script>
-        const API_URL ="https://studentos-0ac0.onrender.com";
+        // Update this URL if hosted elsewhere
+        const API_URL = "https://studentos-0ac0.onrender.com"; 
+        
+        let currentUser = { name: "", usn: "" };
+        let isBackendConnected = false;
 
         const defaultState = {
-            assignments: [
-                { id: 1, title: "Lab Record 4", subject: "Digital Electronics", due: "2026-02-10", status: "todo" },
-            ],
-            attendance: [
-                { subject: "Digital Electronics", attended: 18, total: 25 },
-                { subject: "Maths IV", attended: 15, total: 22 }
-            ],
-            schedule: [
-                { time: "10:00", subject: "Digital Electronics", type: "REGULAR" }
-            ]
+            assignments: [],
+            attendance: [],
+            schedule: []
         };
 
         let state = JSON.parse(JSON.stringify(defaultState));
-        let isBackendConnected = false;
 
-        async function init() {
-            try {
-                const response = await fetch(`${API_URL}/load`);
-                const serverData = await response.json();
-                if (Object.keys(serverData).length !== 0) state = serverData;
-                isBackendConnected = true;
-                updateStatusIndicator(true);
-            } catch (error) {
-                console.error("Backend offline", error);
-                isBackendConnected = false;
-                updateStatusIndicator(false);
+        // --- LOGIN LOGIC ---
+        async function attemptLogin() {
+            const name = document.getElementById('loginUsername').value.trim();
+            const usn = document.getElementById('loginUsn').value.trim().toUpperCase();
+            const errorMsg = document.getElementById('loginError');
+
+            if(!name || !usn) {
+                errorMsg.textContent = "Please enter both Name and USN";
+                errorMsg.style.display = "block";
+                return;
             }
-            
-            // Populate auto-complete suggestions
-            updateSubjectSuggestions();
 
-            const activeTab = document.querySelector('.nav-item.active');
-            if(activeTab) {
-                const view = activeTab.getAttribute('onclick').match(/'([^']+)'/)[1];
-                loadView(view, activeTab);
-            } else {
-                loadView('dashboard', document.querySelector('.nav-item'));
+            // Set current user context
+            currentUser = { name, usn };
+
+            try {
+                // Call Login/Load Endpoint
+                const response = await fetch(`${API_URL}/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(currentUser)
+                });
+
+                if (!response.ok) throw new Error("Server Error");
+
+                const data = await response.json();
+                
+                // If user found in DB, load their state. If not, we keep defaultState (new user)
+                if (data.found && data.state) {
+                    state = data.state;
+                } else {
+                    console.log("New user detected, starting with fresh state.");
+                    state = JSON.parse(JSON.stringify(defaultState));
+                }
+
+                isBackendConnected = true;
+                initializeApp();
+
+            } catch (error) {
+                console.error("Login failed", error);
+                errorMsg.textContent = "Could not connect to server. Check API.";
+                errorMsg.style.display = "block";
+                isBackendConnected = false;
             }
         }
 
+        function initializeApp() {
+            // Hide Login, Show Main Content
+            document.getElementById('login-overlay').style.display = 'none';
+            document.querySelector('.main-content').style.display = 'block';
+            document.getElementById('statusIndicator').style.display = 'block';
+            document.getElementById('userDisplay').textContent = `${currentUser.name} | ${currentUser.usn}`;
+
+            updateStatusIndicator(isBackendConnected);
+            updateSubjectSuggestions();
+            loadView('dashboard', document.querySelector('.nav-item'));
+        }
+
+        function logout() {
+            location.reload(); // Simple reload to clear JS memory and return to login
+        }
+
+        // --- DATA SYNC ---
         async function saveData() {
-            // Update suggestions whenever data changes
             updateSubjectSuggestions();
             
-            // Refresh current view
+            // Refresh current view to show changes immediately
             const activeTab = document.querySelector('.nav-item.active');
             if(activeTab) {
                  const view = activeTab.getAttribute('onclick').match(/'([^']+)'/)[1];
@@ -228,12 +291,18 @@
             }
 
             if (!isBackendConnected) return;
+
             try {
                 await fetch(`${API_URL}/save`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ state: state })
+                    body: JSON.stringify({ 
+                        usn: currentUser.usn,
+                        username: currentUser.name,
+                        state: state 
+                    })
                 });
+                updateStatusIndicator(true);
             } catch (error) {
                 isBackendConnected = false;
                 updateStatusIndicator(false);
@@ -241,11 +310,10 @@
         }
 
         function updateSubjectSuggestions() {
-            // Collect all unique subjects from all lists
             const subjects = new Set();
-            state.attendance.forEach(x => subjects.add(x.subject));
-            state.schedule.forEach(x => subjects.add(x.subject));
-            state.assignments.forEach(x => subjects.add(x.subject));
+            if(state.attendance) state.attendance.forEach(x => subjects.add(x.subject));
+            if(state.schedule) state.schedule.forEach(x => subjects.add(x.subject));
+            if(state.assignments) state.assignments.forEach(x => subjects.add(x.subject));
 
             const datalist = document.getElementById('allSubjectsList');
             datalist.innerHTML = Array.from(subjects).map(s => `<option value="${s}">`).join('');
@@ -254,21 +322,15 @@
         function updateStatusIndicator(connected) {
             const indicator = document.getElementById('statusIndicator');
             if (connected) {
-                indicator.textContent = '✅ Backend Online';
+                indicator.textContent = '✅ Cloud Synced';
                 indicator.className = 'status-indicator status-online';
             } else {
-                indicator.textContent = '❌ Backend Offline';
+                indicator.textContent = '❌ Offline Mode';
                 indicator.className = 'status-indicator status-offline';
             }
         }
 
-        function hardReset() {
-            if(confirm("Factory Reset?")) {
-                state = JSON.parse(JSON.stringify(defaultState));
-                saveData();
-            }
-        }
-
+        // --- VIEWS & RENDERERS ---
         function loadView(viewName, element) {
             const app = document.getElementById('app');
             if(element) {
@@ -282,7 +344,6 @@
             else renderSchedule(app);
         }
 
-        // --- RENDERERS ---
         function renderDashboard(container) {
             const totalTasks = state.assignments.length;
             const doneTasks = state.assignments.filter(t => t.status === 'done').length;
@@ -294,7 +355,7 @@
             container.innerHTML = `
                 <div class="animate-in">
                     <div class="section-header">
-                        <h2>Executive Dashboard</h2>
+                        <h2>Welcome, ${currentUser.name.split(' ')[0]}</h2>
                         <span style="color:var(--secondary)">${new Date().toDateString()}</span>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 30px;">
@@ -322,7 +383,7 @@
             container.innerHTML = `
                 <div class="animate-in" style="height: 100%;">
                     <div class="section-header">
-                        <h2>Assignment Tracker</h2>
+                        <h2>Assignments</h2>
                         <button class="btn" onclick="openModal('assignmentModal')">+ New Task</button>
                     </div>
                     <div class="kanban-board">
@@ -358,41 +419,22 @@
                 <div class="animate-in">
                     <div class="section-header">
                         <h2>Attendance Analytics</h2>
-                        <button class="btn" onclick="openModal('attendanceModal')">+ Track New Subject</button>
+                        <button class="btn" onclick="openModal('attendanceModal')">+ Subject</button>
                     </div>
                     <div class="card">
-                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr 0.5fr; gap: 20px; font-weight: bold; color: var(--secondary); margin-bottom: 15px; font-size: 0.85rem; text-transform: uppercase;">
-                            <div>Subject</div>
-                            <div style="text-align:center;">Attended</div>
-                            <div style="text-align:center;">Total</div>
-                            <div style="text-align:center;">%</div>
-                            <div>Insight</div>
-                            <div></div>
-                        </div>
                         ${state.attendance.map((sub, index) => {
                             const pct = sub.total === 0 ? 0 : Math.round((sub.attended / sub.total) * 100);
-                            const isLow = pct < 75;
-                            const color = isLow ? 'var(--danger)' : 'var(--success)';
-                            const insight = isLow 
-                                ? `Attend next <strong>${Math.max(0, Math.ceil((0.75 * sub.total - sub.attended) / 0.25))}</strong>` 
-                                : `Safe to bunk <strong>${Math.floor((sub.attended - 0.75 * sub.total) / 0.75)}</strong>`;
-
+                            const isLow = pct < 85;
                             return `
                                 <div class="attendance-row">
-                                    <div style="font-weight: 600;">${sub.subject}</div>
+                                    <div style="font-weight: 600; width:30%;">${sub.subject}</div>
                                     <div style="text-align:center;">
                                         <input type="number" class="attendance-input" value="${sub.attended}" onchange="updateAttendance(${index}, 'attended', this.value)">
                                     </div>
                                     <div style="text-align:center;">
                                         <input type="number" class="attendance-input" value="${sub.total}" onchange="updateAttendance(${index}, 'total', this.value)">
                                     </div>
-                                    <div style="text-align:center; font-weight:bold; color:${color};">${pct}%</div>
-                                    <div style="font-size: 0.85rem; color: var(--secondary);">
-                                        <span class="attendance-badge ${isLow ? 'badge-danger' : 'badge-safe'}">
-                                            ${pct < 75 ? '⚠ Warning' : '✅ Safe'}
-                                        </span>
-                                        <div style="font-size: 0.75rem; margin-top: 4px;">${insight}</div>
-                                    </div>
+                                    <div style="text-align:center; font-weight:bold; color:${isLow ? 'var(--danger)' : 'var(--success)'};">${pct}%</div>
                                     <button onclick="deleteAttendanceSubject(${index})" style="background:none; border:none; color:#ef4444; cursor:pointer;">✖</button>
                                 </div>
                             `;
@@ -416,15 +458,13 @@
                                 <div style="display:flex; align-items:center; gap:20px;">
                                     <div style="font-size: 1.1rem; font-weight: 700; background:#f1f5f9; padding:8px 12px; border-radius:8px;">${slot.time}</div>
                                     <div>
-                                        <div style="font-weight: 600; font-size:1.05rem;">${slot.subject}</div>
-                                        <div style="color: var(--secondary); font-size: 0.85rem; margin-top:4px;">
-                                            <span style="background:${slot.type === 'LAB' ? '#e0f2fe' : '#f1f5f9'}; color:${slot.type === 'LAB' ? '#0284c7' : '#64748b'}; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:bold;">${slot.type}</span>
-                                        </div>
+                                        <div style="font-weight: 600;">${slot.subject}</div>
+                                        <span style="font-size:0.75rem; color:var(--secondary);">${slot.type}</span>
                                     </div>
                                 </div>
                                 <button class="btn-danger" onclick="deleteScheduleItem(${index})">🗑</button>
                             </div>
-                        `).join('') || '<p style="color: var(--secondary); text-align: center; padding: 40px;">No classes scheduled.</p>'}
+                        `).join('') || '<p style="color:var(--secondary); text-align:center; padding:20px;">No classes scheduled.</p>'}
                     </div>
                 </div>
             `;
@@ -464,12 +504,10 @@
             saveData();
         }
 
-        // NEW: Add Subject to Attendance
         function addNewAttendanceSubject() {
             const subject = document.getElementById('newAttSubject').value;
             const total = parseInt(document.getElementById('newAttTotal').value) || 0;
             const attended = parseInt(document.getElementById('newAttAttended').value) || 0;
-
             if(!subject) return alert("Subject name required");
 
             state.attendance.push({ subject, attended, total });
@@ -508,9 +546,6 @@
             document.querySelectorAll(`#${id} input`).forEach(i => i.value = '');
         }
 
-        init();
     </script>
 </body>
-
 </html>
-
