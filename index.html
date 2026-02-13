@@ -77,9 +77,10 @@
         .attendance-row { display: flex; align-items: center; gap: 15px; padding: 16px 0; border-bottom: 1px solid var(--border); }
         .attendance-input { width: 65px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; text-align: center; background: var(--bg); color: var(--text); font-weight: 600; }
         
-        .margin-badge { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+        .margin-badge { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; display: inline-block; min-width: 120px; text-align: center;}
         .margin-safe { background: #dcfce7; color: #166534; }
         .margin-warn { background: #fee2e2; color: #991b1b; }
+        .margin-subtext { font-size: 0.7rem; display: block; margin-top: 4px; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -148,26 +149,36 @@
         let isBackendConnected = false;
         let state = { assignments: [], attendance: [], schedule: [] };
 
-        // Helper: Calculate Margin for 85%
+        // --- NEW CALCULATOR LOGIC HERE ---
         function getMarginInfo(attended, total) {
-            const target = 0.85;
-            const currentPct = total === 0 ? 0 : (attended / total);
+            if(total === 0) return { safe: true, text: "No Data", percent: 0, advice: "Track classes" };
+
+            const target = 85;
+            const currentPct = (attended / total) * 100;
             
             if (currentPct >= target) {
-                // How many more can I miss? x <= (A - 0.85T) / 0.85
-                const maxMissable = Math.floor((attended - (target * total)) / target);
+                // Formula: How many future classes can I skip (x) so that:
+                // Attended / (Total + x) >= 0.85
+                // x <= (Attended / 0.85) - Total
+                const bunkable = Math.floor((attended / 0.85) - total);
+                
                 return { 
                     safe: true, 
-                    text: maxMissable > 0 ? `Can miss: ${maxMissable}` : `Margin: Tight`,
-                    percent: Math.round(currentPct * 100)
+                    percent: Math.round(currentPct),
+                    text: `${Math.round(currentPct)}% Safe`,
+                    advice: bunkable > 0 ? `Can skip <b>${bunkable}</b> classes` : `Don't miss next class!`
                 };
             } else {
-                // How many more to attend? y >= (0.85T - A) / 0.15
-                const needed = Math.ceil(((target * total) - attended) / (1 - target));
+                // Formula: How many future classes must I attend (y) so that:
+                // (Attended + y) / (Total + y) >= 0.85
+                // y >= (0.85 * Total - Attended) / (1 - 0.85)
+                const needed = Math.ceil(((0.85 * total) - attended) / 0.15);
+                
                 return { 
                     safe: false, 
-                    text: `Need: ${needed} classes`,
-                    percent: Math.round(currentPct * 100)
+                    percent: Math.round(currentPct),
+                    text: `${Math.round(currentPct)}% Danger`,
+                    advice: `Attend next <b>${needed}</b> classes`
                 };
             }
         }
@@ -220,6 +231,15 @@
             renderCurrentView();
         }
 
+        function renderCurrentView() {
+            const app = document.getElementById('app');
+            app.innerHTML = '';
+            if(currentView === 'dashboard') renderDashboard(app);
+            if(currentView === 'assignments') renderKanban(app);
+            if(currentView === 'attendance') renderAttendance(app);
+            if(currentView === 'schedule') renderSchedule(app);
+        }
+
         function renderDashboard(container) {
             const done = state.assignments.filter(t => t.status === 'done').length;
             const progress = state.assignments.length ? Math.round((done/state.assignments.length)*100) : 0;
@@ -238,9 +258,14 @@
                             <div style="margin-top:15px;">
                                 ${state.attendance.slice(0, 3).map(s => {
                                     const m = getMarginInfo(s.attended, s.total);
-                                    return `<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                                        <span style="font-size:0.9rem">${s.subject}</span>
-                                        <span style="font-weight:700; color:${m.safe ? 'var(--success)' : 'var(--danger)'}">${m.text}</span>
+                                    return `<div style="display:flex; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid #f1f5f9; padding-bottom:8px;">
+                                        <div>
+                                            <span style="font-size:0.95rem; font-weight:600;">${s.subject}</span><br>
+                                            <span style="font-size:0.75rem; color:var(--secondary)">${m.advice}</span>
+                                        </div>
+                                        <div style="text-align:right">
+                                            <span style="font-weight:700; color:${m.safe ? 'var(--success)' : 'var(--danger)'}">${m.percent}%</span>
+                                        </div>
                                     </div>`;
                                 }).join('') || '<p>No subjects tracked.</p>'}
                             </div>
@@ -256,7 +281,8 @@
                 const ctx = document.getElementById('attendanceChart').getContext('2d');
                 const labels = state.attendance.map(s => s.subject);
                 const data = state.attendance.map(s => s.total === 0 ? 0 : Math.round((s.attended/s.total)*100));
-                new Chart(ctx, {
+                if(window.myChart) window.myChart.destroy();
+                window.myChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: labels,
@@ -315,7 +341,10 @@
                                 <input type="number" class="attendance-input" value="${s.total}" onchange="updateAtt(${i}, 'total', this.value)">
                             </div>
                             <div style="flex:1.5; text-align:center">
-                                <span class="margin-badge ${m.safe ? 'margin-safe' : 'margin-warn'}">${m.percent}% — ${m.text}</span>
+                                <div class="margin-badge ${m.safe ? 'margin-safe' : 'margin-warn'}">
+                                    ${m.text}
+                                    <span class="margin-subtext">${m.advice}</span>
+                                </div>
                             </div>
                             <div style="flex:0.5; text-align:right">
                                 <button class="btn-danger" onclick="deleteAtt(${i})">✖</button>
