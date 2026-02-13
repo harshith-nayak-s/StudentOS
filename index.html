@@ -74,8 +74,12 @@
         .status-online { background: #dcfce7; color: #166534; }
         .status-offline { background: #fee2e2; color: #991b1b; }
 
-        .attendance-row { display: flex; align-items: center; gap: 15px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-        .attendance-input { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; text-align: center; background: var(--bg); color: var(--text); }
+        .attendance-row { display: flex; align-items: center; gap: 15px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .attendance-input { width: 65px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; text-align: center; background: var(--bg); color: var(--text); font-weight: 600; }
+        
+        .margin-badge { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+        .margin-safe { background: #dcfce7; color: #166534; }
+        .margin-warn { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body>
@@ -142,8 +146,31 @@
         let currentUser = { username: "", usn: "" };
         let currentView = 'dashboard';
         let isBackendConnected = false;
-        let attendanceChart = null;
         let state = { assignments: [], attendance: [], schedule: [] };
+
+        // Helper: Calculate Margin for 85%
+        function getMarginInfo(attended, total) {
+            const target = 0.85;
+            const currentPct = total === 0 ? 0 : (attended / total);
+            
+            if (currentPct >= target) {
+                // How many more can I miss? x <= (A - 0.85T) / 0.85
+                const maxMissable = Math.floor((attended - (target * total)) / target);
+                return { 
+                    safe: true, 
+                    text: maxMissable > 0 ? `Can miss: ${maxMissable}` : `Margin: Tight`,
+                    percent: Math.round(currentPct * 100)
+                };
+            } else {
+                // How many more to attend? y >= (0.85T - A) / 0.15
+                const needed = Math.ceil(((target * total) - attended) / (1 - target));
+                return { 
+                    safe: false, 
+                    text: `Need: ${needed} classes`,
+                    percent: Math.round(currentPct * 100)
+                };
+            }
+        }
 
         async function attemptLogin() {
             const name = document.getElementById('loginUsername').value.trim();
@@ -171,15 +198,6 @@
             }
         }
 
-        function renderCurrentView() {
-            const app = document.getElementById('app');
-            app.innerHTML = '';
-            if(currentView === 'dashboard') renderDashboard(app);
-            else if(currentView === 'assignments') renderKanban(app);
-            else if(currentView === 'attendance') renderAttendance(app);
-            else if(currentView === 'schedule') renderSchedule(app);
-        }
-
         async function saveData() {
             renderCurrentView(); 
             updateStatusIndicator(isBackendConnected);
@@ -202,7 +220,6 @@
             renderCurrentView();
         }
 
-        // --- DASHBOARD WITH CHART ---
         function renderDashboard(container) {
             const done = state.assignments.filter(t => t.status === 'done').length;
             const progress = state.assignments.length ? Math.round((done/state.assignments.length)*100) : 0;
@@ -217,8 +234,16 @@
                             <p>${done} of ${state.assignments.length} completed</p>
                         </div>
                         <div class="card">
-                            <h3>Upcoming</h3>
-                            <p style="margin-top:10px; color:var(--secondary)">${state.schedule.length} classes today</p>
+                            <h3>Bunking Margin (85%)</h3>
+                            <div style="margin-top:15px;">
+                                ${state.attendance.slice(0, 3).map(s => {
+                                    const m = getMarginInfo(s.attended, s.total);
+                                    return `<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                                        <span style="font-size:0.9rem">${s.subject}</span>
+                                        <span style="font-weight:700; color:${m.safe ? 'var(--success)' : 'var(--danger)'}">${m.text}</span>
+                                    </div>`;
+                                }).join('') || '<p>No subjects tracked.</p>'}
+                            </div>
                         </div>
                     </div>
                     <div class="card">
@@ -227,12 +252,10 @@
                     </div>
                 </div>`;
             
-            // Initialize Chart
             setTimeout(() => {
                 const ctx = document.getElementById('attendanceChart').getContext('2d');
                 const labels = state.attendance.map(s => s.subject);
                 const data = state.attendance.map(s => s.total === 0 ? 0 : Math.round((s.attended/s.total)*100));
-                
                 new Chart(ctx, {
                     type: 'bar',
                     data: {
@@ -240,20 +263,15 @@
                         datasets: [{
                             label: 'Attendance %',
                             data: data,
-                            backgroundColor: data.map(v => v < 75 ? '#ef4444' : '#2563eb'),
+                            backgroundColor: data.map(v => v < 85 ? '#ef4444' : '#2563eb'),
                             borderRadius: 6
                         }]
                     },
-                    options: { 
-                        responsive: true,
-                        scales: { y: { beginAtZero: true, max: 100 } },
-                        plugins: { legend: { display: false } }
-                    }
+                    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
                 });
             }, 50);
         }
 
-        // --- REMAINDER OF FUNCTIONS ---
         function renderKanban(container) {
             const cols = { todo: [], doing: [], done: [] };
             state.assignments.forEach(t => cols[t.status].push(t));
@@ -278,22 +296,38 @@
 
         function renderAttendance(container) {
             container.innerHTML = `
-                <div class="section-header"><h2>Attendance</h2><button class="btn" onclick="openModal('attendanceModal')">+ Subject</button></div>
+                <div class="section-header"><h2>Attendance Tracker (85% Target)</h2><button class="btn" onclick="openModal('attendanceModal')">+ Subject</button></div>
                 <div class="card">
-                    ${state.attendance.map((s, i) => `
+                    <div class="attendance-row" style="font-weight:700; color:var(--secondary); border-bottom:2px solid var(--border)">
+                        <span style="flex:2">Subject</span>
+                        <span style="flex:1; text-align:center">Attendance</span>
+                        <span style="flex:1.5; text-align:center">Bunking Margin</span>
+                        <span style="flex:0.5; text-align:right">Action</span>
+                    </div>
+                    ${state.attendance.map((s, i) => {
+                        const m = getMarginInfo(s.attended, s.total);
+                        return `
                         <div class="attendance-row">
                             <span style="flex:2; font-weight:600;">${s.subject}</span>
-                            <input type="number" class="attendance-input" value="${s.attended}" onchange="updateAtt(${i}, 'attended', this.value)">
-                            <span>/</span>
-                            <input type="number" class="attendance-input" value="${s.total}" onchange="updateAtt(${i}, 'total', this.value)">
-                            <button class="btn-danger" onclick="deleteAtt(${i})">✖</button>
-                        </div>`).join('') || '<p>No subjects added.</p>'}
+                            <div style="flex:1; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                <input type="number" class="attendance-input" value="${s.attended}" onchange="updateAtt(${i}, 'attended', this.value)">
+                                <span>/</span>
+                                <input type="number" class="attendance-input" value="${s.total}" onchange="updateAtt(${i}, 'total', this.value)">
+                            </div>
+                            <div style="flex:1.5; text-align:center">
+                                <span class="margin-badge ${m.safe ? 'margin-safe' : 'margin-warn'}">${m.percent}% — ${m.text}</span>
+                            </div>
+                            <div style="flex:0.5; text-align:right">
+                                <button class="btn-danger" onclick="deleteAtt(${i})">✖</button>
+                            </div>
+                        </div>`;
+                    }).join('') || '<p style="padding:20px; text-align:center">No subjects added.</p>'}
                 </div>`;
         }
 
         function renderSchedule(container) {
             container.innerHTML = `
-                <div class="section-header"><h2>Schedule</h2><button class="btn" onclick="openModal('scheduleModal')">+ Class</button></div>
+                <div class="section-header"><h2>Weekly Schedule</h2><button class="btn" onclick="openModal('scheduleModal')">+ Class</button></div>
                 <div class="card">
                     ${state.schedule.sort((a,b)=>a.time.localeCompare(b.time)).map((s, i) => `
                         <div class="attendance-row">
